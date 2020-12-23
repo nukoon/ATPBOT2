@@ -20,13 +20,14 @@ class DriverSubscriber(Node):
             self.listener_callback,
             10)
         self.client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
+        self.client.connect()
         self.velocity_mode_left = self.client.write_register(8242, 3, unit=UNIT)
         self.motor_enable_left = self.client.write_register(8241, 8, unit=UNIT)
         assert (not self.velocity_mode_left.isError())
         assert (not self.motor_enable_left.isError())
         self.subscription  # prevent unused variable warning
         self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
-        print(self.client)
+        
 
     def listener_callback(self, msg):
         if msg.linear.x > 0 and msg.linear.x <= 260 : 
