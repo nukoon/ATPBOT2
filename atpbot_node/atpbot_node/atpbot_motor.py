@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 import sys
+import struct
 import RPi.GPIO as GPIO 
 import time
 import geometry_msgs.msg
@@ -28,6 +29,9 @@ class DriverSubscriber(Node):
         self.subscription  # prevent unused variable warning
         self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
         
+    def signed(self, value):
+        packval = struct.pack('<h',value)
+        return struct.unpack('<H',packval)[0]
 
     def listener_callback(self, msg):
         if msg.linear.x > 0 and msg.linear.x <= 260 : 
@@ -38,8 +42,9 @@ class DriverSubscriber(Node):
             print ("Go Left") 
 
         if msg.linear.x < 0 and msg.linear.x > -260:
+            self.motor_vel1 = self.client.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
             print ("Go Back") 
-
+	
         if msg.angular.z > -260 and msg.angular.z < 0: 
             print ("Go Right")
 
