@@ -26,10 +26,13 @@ class DriverSubscriber(Node):
         assert (not self.motor_enable_left.isError())
         self.subscription  # prevent unused variable warning
         self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
+        print(self.client)
+
     def listener_callback(self, msg):
         if msg.linear.x > 0 and msg.linear.x <= 260 : 
+            print ("Go forward") 
             self.motor_vel1 = self.client.write_register(8250, int(msg.linear.x), unit=UNIT)
-
+            assert (not self.velocity_mode_left.isError())
         if msg.angular.z > 0 and msg.angular.z <= 260:
             print ("Go Left") 
 
