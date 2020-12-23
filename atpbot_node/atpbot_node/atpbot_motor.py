@@ -6,8 +6,10 @@ import struct
 import RPi.GPIO as GPIO 
 import time
 import geometry_msgs.msg
-from std_msgs.msg import String
+from std_msgs.msg import String, Int32
 from pymodbus.client.sync import ModbusSerialClient as ModbusClient
+from concurrent.futures import ThreadPoolExecutor
+from rclpy.executors import Executor
 
 UNIT = 0x1
 
@@ -28,6 +30,15 @@ class DriverSubscriber(Node):
         assert (not self.motor_enable_left.isError())
         self.subscription  # prevent unused variable warning
         self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
+        self.left_enc_pub = self.create_publisher(Int32, "enc_left", 10)
+        self.right_enc_pub = self.create_publisher(Int32, "enc_right", 10)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+    def timer_callback(self):
+        motor_enc_get = self.client.read_holding_registers(8234, 2, unit=UNIT)
+        value = Int32()
+        value.data = int(motor_enc_get.registers[1])
+        self.left_enc_pub.publist(value)   
+        self.right_enc_pub.publist(value) 
         
     def signed(self, value):
         packval = struct.pack('<h',value)
@@ -52,8 +63,6 @@ class DriverSubscriber(Node):
             print ("Stop!!!") 
             self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
         #self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
-
-
 
 def main(args=None):
     rclpy.init(args=args)
