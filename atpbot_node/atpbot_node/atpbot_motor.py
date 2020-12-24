@@ -95,6 +95,7 @@ class RightSubscriber(Node):
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
+        self.publisher_.publish(value)
 
 class LeftSubscriber(Node):
     global client, motor_vel1
@@ -102,13 +103,14 @@ class LeftSubscriber(Node):
         super().__init__('Enc_left_Pub')
         self.publisher_ = self.create_publisher(Int32, 'enc_left', 10)
         timer_period = 0.001  # seconds
-        self.timer = self.create_timer(timer_period, self.publisher_callback)
+        self.timer = self.create_timer(timer_period, self.publisher_callback)      
 
     def publisher_callback(self):
         global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
+        self.publisher_.publish(value)
 
 def main(args=None):
     rclpy.init(args=args)
