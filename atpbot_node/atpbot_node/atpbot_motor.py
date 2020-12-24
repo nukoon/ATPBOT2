@@ -13,8 +13,12 @@ from rclpy.executors import Executor
 
 UNIT = 0x1
 
+client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
+client.connect()
+motor_vel1 = client.write_register(8250, 0, unit=UNIT)
 
 class DriverSubscriber(Node):
+    global client, motor_vel1
     def __init__(self):
         super().__init__('motor_cmd_vel')
         self.subscription = self.create_subscription(
@@ -22,24 +26,12 @@ class DriverSubscriber(Node):
             'cmd_vel',
             self.listener_callback,
             10)
-        self.client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
-        self.client.connect()
-        self.velocity_mode_left = self.client.write_register(8242, 3, unit=UNIT)
-        self.motor_enable_left = self.client.write_register(8241, 8, unit=UNIT)
+        
+        self.velocity_mode_left = client.write_register(8242, 3, unit=UNIT)
+        self.motor_enable_left = client.write_register(8241, 8, unit=UNIT)
         assert (not self.velocity_mode_left.isError())
         assert (not self.motor_enable_left.isError())
-        self.subscription  # prevent unused variable warning
-        self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
-        self.left_enc_pub = self.create_publisher(Int32, "enc_left", 10)
-        self.right_enc_pub = self.create_publisher(Int32, "enc_right", 10)
-        self.timer = self.create_timer(0.1, self.timer_callback)
-    def timer_callback(self):
-        motor_enc_get = self.client.read_holding_registers(8234, 2, unit=UNIT)
-        value = Int32()
-        value.data = int(motor_enc_get.registers[1])
-        self.left_enc_pub.publist(value)   
-        self.right_enc_pub.publist(value) 
-        
+
     def signed(self, value):
         packval = struct.pack('<h',value)
         return struct.unpack('<H',packval)[0]
@@ -47,8 +39,8 @@ class DriverSubscriber(Node):
     def listener_callback(self, msg):
         if msg.linear.x > 0 and msg.linear.x <= 260 : 
             print ("Go forward") 
-            self.motor_vel1 = self.client.write_register(8250, int(msg.linear.x), unit=UNIT)
-            assert (not self.velocity_mode_left.isError())
+            self.motor_vel1 = client.write_register(8250, int(msg.linear.x), unit=UNIT)
+
         if msg.angular.z > 0 and msg.angular.z <= 260:
             print ("Go Left") 
 
@@ -64,11 +56,76 @@ class DriverSubscriber(Node):
             self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
         #self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
 
+class PriorityExecutor(Executor):
+    global client, motor_vel1
+    def __init__(self):
+        super().__init__()
+        self.high_priority_nodes = set()
+        self.hp_executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+        self.lp_executor = ThreadPoolExecutor(max_workers=1)
+
+    def add_high_priority_node(self, node):
+        self.high_priority_nodes.add(node)
+        # add_node inherited
+        self.add_node(node)
+
+    def spin_once(self, timeout_sec=None):
+        # wait_for_ready_callbacks yields callbacks that are ready to be executed
+        try:
+            handler, group, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+
+        except StopIteration:
+            pass
+        else:
+            if node in self.high_priority_nodes:
+                self.hp_executor.submit(handler)
+            else:
+                self.lp_executor.submit(handler)
+
+class RightSubscriber(Node):
+    global client, motor_vel1
+    def __init__(self):
+        super().__init__('Enc_right_Sub')
+        self.subscription = self.create_subscription(
+            Int32,
+            'enc_right',
+            self.listener_callback,
+            10)
+        self.subscription  # prevent unused variable warning
+
+    def listener_callback(self, msg):
+        motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
+        value = Int32()
+        value.data = int(motor_enc_get.registers[1])
+
+class LeftSubscriber(Node):
+    def __init__(self):
+        super().__init__('Enc_left_Sub')
+        self.subscription = self.create_subscription(
+            Int32,
+            'enc_left',
+            self.listener_callback,
+            10)
+        self.subscription  # prevent unused variable warning
+        self.lastEnc = 0
+
+    def listener_callback(self, msg):
+        motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
+        value = Int32()
+        value.data = int(motor_enc_get.registers[1])
+
 def main(args=None):
     rclpy.init(args=args)
     driver_subscriber = DriverSubscriber()
-  
-    rclpy.spin(driver_subscriber)
+    enc_left_node = LeftSubscriber()
+    enc_right_node = RightSubscriber()
+
+    executor = PriorityExecutor()
+    executor.add_high_priority_node(driver_subscriber)
+    executor.add_node(enc_left_node)
+    executor.add_node(enc_right_node)
+
+    executor.spin()
 
     driver_subscriber.destroy_node()
     rclpy.shutdown()
