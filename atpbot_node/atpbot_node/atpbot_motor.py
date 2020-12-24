@@ -90,7 +90,7 @@ class RightSubscriber(Node):
         timer_period = 0.001  # seconds
         self.timer = self.create_timer(timer_period, self.publisher_callback)
 
-    def publisher_callback(self, msg):
+    def publisher_callback(self):
         global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
@@ -104,7 +104,7 @@ class LeftSubscriber(Node):
         timer_period = 0.001  # seconds
         self.timer = self.create_timer(timer_period, self.publisher_callback)
 
-    def publisher_callback(self, msg):
+    def publisher_callback(self):
         global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
