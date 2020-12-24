@@ -16,9 +16,11 @@ UNIT = 0x1
 client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
 client.connect()
 motor_vel1 = client.write_register(8250, 0, unit=UNIT)
-
+velocity_mode_left = client.write_register(8242, 3, unit=UNIT)
+motor_enable_left = client.write_register(8241, 8, unit=UNIT)
+assert (not velocity_mode_left.isError())
+assert (not motor_enable_left.isError())
 class DriverSubscriber(Node):
-    global client, motor_vel1
     def __init__(self):
         super().__init__('motor_cmd_vel')
         self.subscription = self.create_subscription(
@@ -26,26 +28,22 @@ class DriverSubscriber(Node):
             'cmd_vel',
             self.listener_callback,
             10)
-        
-        self.velocity_mode_left = client.write_register(8242, 3, unit=UNIT)
-        self.motor_enable_left = client.write_register(8241, 8, unit=UNIT)
-        assert (not self.velocity_mode_left.isError())
-        assert (not self.motor_enable_left.isError())
 
     def signed(self, value):
         packval = struct.pack('<h',value)
         return struct.unpack('<H',packval)[0]
 
     def listener_callback(self, msg):
+        global client, motor_vel1
         if msg.linear.x > 0 and msg.linear.x <= 260 : 
             print ("Go forward") 
-            self.motor_vel1 = client.write_register(8250, int(msg.linear.x), unit=UNIT)
+            motor_vel1 = client.write_register(8250, int(msg.linear.x), unit=UNIT)
 
         if msg.angular.z > 0 and msg.angular.z <= 260:
             print ("Go Left") 
 
         if msg.linear.x < 0 and msg.linear.x > -260:
-            self.motor_vel1 = self.client.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
+            motor_vel1 = client.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
             print ("Go Back") 
 	
         if msg.angular.z > -260 and msg.angular.z < 0: 
@@ -53,11 +51,10 @@ class DriverSubscriber(Node):
 
         if msg.linear.x == 0 and msg.angular.z == 0:
             print ("Stop!!!") 
-            self.motor_vel1 = self.client.write_register(8250, 0, unit=UNIT)
+            motor_vel1 = client.write_register(8250, 0, unit=UNIT)
         #self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
 
 class PriorityExecutor(Executor):
-    global client, motor_vel1
     def __init__(self):
         super().__init__()
         self.high_priority_nodes = set()
@@ -94,6 +91,7 @@ class RightSubscriber(Node):
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
+        global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
