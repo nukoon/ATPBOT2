@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-import sys
+import sys, os
 import struct
 import RPi.GPIO as GPIO 
 import time
