@@ -17,9 +17,10 @@ client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=11
 isConnected = client.connect()
 
 print(isConnected)
-motor_vel1 = client.write_register(8250, 0, unit=UNIT)
+
 velocity_mode_left = client.write_register(8242, 3, unit=UNIT)
 motor_enable_left = client.write_register(8241, 8, unit=UNIT)
+motor_vel1 = client.write_register(8250, 0, unit=UNIT)
 assert (not velocity_mode_left.isError())
 assert (not motor_enable_left.isError())
 class DriverSubscriber(Node):
