@@ -85,32 +85,27 @@ class PriorityExecutor(Executor):
 class RightSubscriber(Node):
     global client, motor_vel1
     def __init__(self):
-        super().__init__('Enc_right_Sub')
-        self.subscription = self.create_subscription(
-            Int32,
-            'enc_right',
-            self.listener_callback,
-            10)
-        self.subscription  # prevent unused variable warning
+        super().__init__('Enc_right_Pub')
+        self.publisher_ = self.create_publisher(Int32, 'enc_right', 10)
+        timer_period = 0.001  # seconds
+        self.timer = self.create_timer(timer_period, self.publisher_callback)
 
-    def listener_callback(self, msg):
+    def publisher_callback(self, msg):
         global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
 
 class LeftSubscriber(Node):
+    global client, motor_vel1
     def __init__(self):
-        super().__init__('Enc_left_Sub')
-        self.subscription = self.create_subscription(
-            Int32,
-            'enc_left',
-            self.listener_callback,
-            10)
-        self.subscription  # prevent unused variable warning
-        self.lastEnc = 0
+        super().__init__('Enc_left_Pub')
+        self.publisher_ = self.create_publisher(Int32, 'enc_left', 10)
+        timer_period = 0.001  # seconds
+        self.timer = self.create_timer(timer_period, self.publisher_callback)
 
-    def listener_callback(self, msg):
+    def publisher_callback(self, msg):
+        global client, motor_vel1
         motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
