@@ -22,8 +22,8 @@ class OdomPublisher(Node):
         self.create_timer(1.0/self.rate_hz, self.update)  
 
         self.ticks_meter = float(
-            self.declare_parameter('ticks_meter', 2227).value)  # The number of wheel encoder ticks per meter of travel
-        self.base_width = float(self.declare_parameter('base_width', 0.36).value)  # The wheel base width in meters
+            self.declare_parameter('ticks_meter', 7680).value)  # The number of wheel encoder ticks per meter of travel
+        self.base_width = float(self.declare_parameter('base_width', 0.35).value)  # The wheel base width in meters
 
         self.base_frame_id = self.declare_parameter('base_frame_id',
                                                     'base_link').value  # the name of the base frame of the robot
@@ -87,9 +87,9 @@ class OdomPublisher(Node):
         if d != 0:
             # calculate distance traveled in x and y
             x = cos(th) * d
-            y = -sin(th) * d
+            y = sin(th) * d
             # calculate the final position of the robot
-            self.x = self.x + (cos(self.th) * x - sin(self.th) * y)
+            self.x = self.x + (cos(self.th) * x + sin(self.th) * y)
             self.y = self.y + (sin(self.th) * x + cos(self.th) * y)
         if th != 0:
             self.th = self.th + th
@@ -121,11 +121,14 @@ class OdomPublisher(Node):
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = 0.0
-        odom.pose.pose.orientation = quaternion
+        odom.pose.pose.orientation.x = quaternion.x
+        odom.pose.pose.orientation.y = quaternion.y
+        odom.pose.pose.orientation.z = quaternion.z
+        odom.pose.pose.orientation.w = quaternion.w
         odom.child_frame_id = self.base_frame_id
         odom.twist.twist.linear.x = self.dx
         odom.twist.twist.linear.y = 0.0
-        odom.twist.twist.angular.z = self.dr
+        odom.twist.twist.angular.z = self.th
         self.odom_pub.publish(odom)
 
     def lwheel_callback(self, msg):
