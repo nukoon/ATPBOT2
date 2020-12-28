@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 import sys, os
 import struct
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 import time
 import geometry_msgs.msg
 from std_msgs.msg import String, Int32
@@ -12,15 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 from rclpy.executors import Executor
 
 UNIT = 0x1
-UNIT2 = 0x5
+UNIT2 = 0x3
 
 client_left = ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
 client_right = ModbusClient(method='rtu', port='/dev/ttyUSB1', timeout=1, baudrate=115200)
 isConnected_left = client_left.connect()
 isConnected_right = client_right.connect()
 
-print(isConnected_left)
-print(isConnected_right)
+
 
 velocity_mode_left = client_left.write_register(8242, 3, unit=UNIT)
 motor_enable_left = client_left.write_register(8241, 8, unit=UNIT)
@@ -34,6 +33,8 @@ assert (not motor_enable_left.isError())
 assert (not velocity_mode_right.isError())
 assert (not motor_enable_right.isError())
 
+print(isConnected_left)
+print(isConnected_right)
 
 class DriverSubscriber(Node):
     def __init__(self):
@@ -53,21 +54,21 @@ class DriverSubscriber(Node):
         if msg.linear.x > 0 and msg.linear.x <= 260:
             print("Go forward")
             motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x * -1)), unit=UNIT2)
 
         if msg.angular.z > 0 and msg.angular.z <= 260:
-            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
+            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.angular.z * -1)), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.angular.z * -1)), unit=UNIT2)
             print("Go Left")
 
         if msg.linear.x < 0 and msg.linear.x > -260:
             motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
+            motor_vel2 = client_right.write_register(8250,  self.signed(int(msg.linear.x * -1)), unit=UNIT2)
             print("Go Back")
 
         if msg.angular.z > -260 and msg.angular.z < 0:
-            motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
+            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.angular.z * -1)), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.angular.z)), unit=UNIT2)
             print("Go Right")
 
         if msg.linear.x == 0 and msg.angular.z == 0:
@@ -140,13 +141,13 @@ class LeftSubscriber(Node):
 def main(args=None):
     rclpy.init(args=args)
     driver_subscriber = DriverSubscriber()
-    enc_left_node = LeftSubscriber()
-    enc_right_node = RightSubscriber()
+    #enc_left_node = LeftSubscriber()
+    #enc_right_node = RightSubscriber()
 
     executor = PriorityExecutor()
     executor.add_high_priority_node(driver_subscriber)
-    executor.add_node(enc_left_node)
-    executor.add_node(enc_right_node)
+    #executor.add_node(enc_left_node)
+    #executor.add_node(enc_right_node)
 
     executor.spin()
 
