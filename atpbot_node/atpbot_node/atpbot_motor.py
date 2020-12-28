@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 import sys, os
 import struct
-import RPi.GPIO as GPIO 
+import RPi.GPIO as GPIO
 import time
 import geometry_msgs.msg
 from std_msgs.msg import String, Int32
@@ -12,17 +12,29 @@ from concurrent.futures import ThreadPoolExecutor
 from rclpy.executors import Executor
 
 UNIT = 0x1
+UNIT2 = 0x5
 
-client =  ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
-isConnected = client.connect()
+client_left = ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=115200)
+client_right = ModbusClient(method='rtu', port='/dev/ttyUSB1', timeout=1, baudrate=115200)
+isConnected_left = client_left.connect()
+isConnected_right = client_right.connect()
 
-print(isConnected)
+print(isConnected_left)
+print(isConnected_right)
 
-velocity_mode_left = client.write_register(8242, 3, unit=UNIT)
-motor_enable_left = client.write_register(8241, 8, unit=UNIT)
-motor_vel1 = client.write_register(8250, 0, unit=UNIT)
+velocity_mode_left = client_left.write_register(8242, 3, unit=UNIT)
+motor_enable_left = client_left.write_register(8241, 8, unit=UNIT)
+motor_vel1 = client_left.write_register(8250, 0, unit=UNIT)
+velocity_mode_right = client_right.write_register(8242, 3, unit=UNIT2)
+motor_enable_right = client_right.write_register(8241, 8, unit=UNIT2)
+motor_vel2 = client_right.write_register(8250, 0, unit=UNIT2)
+
 assert (not velocity_mode_left.isError())
 assert (not motor_enable_left.isError())
+assert (not velocity_mode_right.isError())
+assert (not motor_enable_right.isError())
+
+
 class DriverSubscriber(Node):
     def __init__(self):
         super().__init__('motor_cmd_vel')
@@ -33,29 +45,37 @@ class DriverSubscriber(Node):
             10)
 
     def signed(self, value):
-        packval = struct.pack('<h',value)
-        return struct.unpack('<H',packval)[0]
+        packval = struct.pack('<h', value)
+        return struct.unpack('<H', packval)[0]
 
     def listener_callback(self, msg):
-        global client, motor_vel1
-        if msg.linear.x > 0 and msg.linear.x <= 260 : 
-            print ("Go forward") 
-            motor_vel1 = client.write_register(8250, int(msg.linear.x), unit=UNIT)
+        global client_left , client_right , motor_vel1 , motor_vel2
+        if msg.linear.x > 0 and msg.linear.x <= 260:
+            print("Go forward")
+            motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
 
         if msg.angular.z > 0 and msg.angular.z <= 260:
-            print ("Go Left") 
+            motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
+            print("Go Left")
 
         if msg.linear.x < 0 and msg.linear.x > -260:
-            motor_vel1 = client.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
-            print ("Go Back") 
-	
-        if msg.angular.z > -260 and msg.angular.z < 0: 
-            print ("Go Right")
+            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
+            print("Go Back")
+
+        if msg.angular.z > -260 and msg.angular.z < 0:
+            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
+            print("Go Right")
 
         if msg.linear.x == 0 and msg.angular.z == 0:
-            print ("Stop!!!") 
-            motor_vel1 = client.write_register(8250, 0, unit=UNIT)
-        #self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
+            print("Stop!!!")
+            motor_vel1 = client_left.write_register(8250, 0, unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, 0, unit=UNIT2)
+        # self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
+
 
 class PriorityExecutor(Executor):
     def __init__(self):
@@ -82,8 +102,10 @@ class PriorityExecutor(Executor):
             else:
                 self.lp_executor.submit(handler)
 
+
 class RightSubscriber(Node):
-    global client, motor_vel1
+    global client_left , client_right , motor_vel1 , motor_vel2
+
     def __init__(self):
         super().__init__('Enc_right_Pub')
         self.publisher_ = self.create_publisher(Int32, 'enc_right', 10)
@@ -91,26 +113,29 @@ class RightSubscriber(Node):
         self.timer = self.create_timer(timer_period, self.publisher_callback)
 
     def publisher_callback(self):
-        global client, motor_vel1
-        motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
+        global client_left , client_right , motor_vel1 , motor_vel2
+        motor_enc_get = client_right.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
         self.publisher_.publish(value)
 
+
 class LeftSubscriber(Node):
-    global client, motor_vel1
+    global client_left , client_right , motor_vel1 , motor_vel2
+
     def __init__(self):
         super().__init__('Enc_left_Pub')
         self.publisher_ = self.create_publisher(Int32, 'enc_left', 10)
         timer_period = 0.001  # seconds
-        self.timer = self.create_timer(timer_period, self.publisher_callback)      
+        self.timer = self.create_timer(timer_period, self.publisher_callback)
 
     def publisher_callback(self):
-        global client, motor_vel1
-        motor_enc_get = client.read_holding_registers(8234, 2, unit=UNIT)
+        global client_left , client_right , motor_vel1 , motor_vel2
+        motor_enc_get = client_left.read_holding_registers(8234, 2, unit=UNIT)
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
         self.publisher_.publish(value)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -131,4 +156,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
