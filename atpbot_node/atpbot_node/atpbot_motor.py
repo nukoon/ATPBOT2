@@ -56,8 +56,8 @@ class DriverSubscriber(Node):
             motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
 
         if msg.angular.z > 0 and msg.angular.z <= 260:
-            motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
+            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
             print("Go Left")
 
         if msg.linear.x < 0 and msg.linear.x > -260:
@@ -66,8 +66,8 @@ class DriverSubscriber(Node):
             print("Go Back")
 
         if msg.angular.z > -260 and msg.angular.z < 0:
-            motor_vel1 = client_left.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT)
-            motor_vel2 = client_right.write_register(8250, int(msg.linear.x), unit=UNIT2)
+            motor_vel1 = client_left.write_register(8250, int(msg.linear.x), unit=UNIT)
+            motor_vel2 = client_right.write_register(8250, self.signed(int(msg.linear.x)), unit=UNIT2)
             print("Go Right")
 
         if msg.linear.x == 0 and msg.angular.z == 0:
