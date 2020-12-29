@@ -192,7 +192,6 @@ void rplidar_node::publish_scan(
   m_publisher->publish(scan_msg);
 }
 
-
 bool rplidar_node::getRPLIDARDeviceInfo() const
 {
   u_result op_result;
