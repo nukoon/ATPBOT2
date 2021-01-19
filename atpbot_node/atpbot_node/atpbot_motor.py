@@ -20,7 +20,6 @@ isConnected_left = client_left.connect()
 isConnected_right = client_right.connect()
 
 
-
 velocity_mode_left = client_left.write_register(8242, 3, unit=UNIT)
 motor_enable_left = client_left.write_register(8241, 8, unit=UNIT)
 motor_vel1 = client_left.write_register(8250, 0, unit=UNIT)
@@ -30,14 +29,11 @@ motor_vel2 = client_right.write_register(8250, 0, unit=UNIT2)
 
 assert (not velocity_mode_left.isError())
 assert (not motor_enable_left.isError())
-<<<<<<< HEAD
-=======
 assert (not velocity_mode_right.isError())
 assert (not motor_enable_right.isError())
 
 print(isConnected_left)
 print(isConnected_right)
->>>>>>> badfac416af5ab4158ec6737d9c3638ecc4153a4
 
 class DriverSubscriber(Node):
     def __init__(self):
@@ -86,17 +82,26 @@ class DriverSubscriber(Node):
 
         if msg.linear.x == 0 and msg.angular.z == 0:
             print("Process Stopping")
-            i = 20
-            while i > 0:
-                if self.direction = "forward":
-                    motor_vel1 = client_left.write_register(8250, int(i), unit=UNIT)
-                    motor_vel2 = client_right.write_register(8250, self.signed(int(i * -1)), unit=UNIT2)
-                elif self.direction = "back":
-                    motor_vel1 = client_left.write_register(8250, int(i * -1), unit=UNIT)
-                    motor_vel2 = client_right.write_register(8250, self.signed(int(i)), unit=UNIT2)
-                i -= 2
+            print("slow Down " , self.direction) 
+            i = 0
+            if self.old_cmd > 0 :
+                i = self.old_cmd
+            else:
+                i = self.old_cmd * -1
+            print("old cmd : " , i)
+#            while i > 2:
+#                if self.direction == "forward":
+#                    motor_vel1 = client_left.write_register(8250, int(i), unit=UNIT)
+#                    motor_vel2 = client_right.write_register(8250, self.signed(int(i * -1)), unit=UNIT2)
+#                elif self.direction == "back":
+#                    motor_vel1 = client_left.write_register(8250, int(i * -1), unit=UNIT)
+#                    motor_vel2 = client_right.write_register(8250, self.signed(int(i)), unit=UNIT2)
+#                i -= 2
+#                print("cmd : " , i )
+#                time.sleep(0.1)
             motor_vel1 = client_left.write_register(8250, 0, unit=UNIT)
             motor_vel2 = client_right.write_register(8250, 0, unit=UNIT2)
+            self.old_cmd = 0
             print("Stoped!!!")
         # self.get_logger().info("x = " , str(msg.linear.x) , " z =" , str(msg.linear.z))
 
@@ -138,10 +143,13 @@ class RightSubscriber(Node):
 
     def publisher_callback(self):
         global client_left , client_right , motor_vel1 , motor_vel2
-        motor_enc_get = client_right.read_holding_registers(8234, 2, unit=UNIT)
+        motor_enc_get = client_right.read_holding_registers(8234, 2, unit=UNIT2)
+        assert(not motor_enc_get.isError())
         value = Int32()
-        value.data = int(motor_enc_get.registers[1])
+        value.data = int(motor_enc_get.registers[1])*-1
         self.publisher_.publish(value)
+        #self.get_logger().info("Publishing : %d" %value.data)
+        #self.i +=1
 
 
 class LeftSubscriber(Node):
@@ -156,6 +164,7 @@ class LeftSubscriber(Node):
     def publisher_callback(self):
         global client_left , client_right , motor_vel1 , motor_vel2
         motor_enc_get = client_left.read_holding_registers(8234, 2, unit=UNIT)
+        assert (not motor_enc_get.isError())
         value = Int32()
         value.data = int(motor_enc_get.registers[1])
         self.publisher_.publish(value)
@@ -164,13 +173,13 @@ class LeftSubscriber(Node):
 def main(args=None):
     rclpy.init(args=args)
     driver_subscriber = DriverSubscriber()
-    #enc_left_node = LeftSubscriber()
-    #enc_right_node = RightSubscriber()
+    enc_left_node = LeftSubscriber()
+    enc_right_node = RightSubscriber()
 
     executor = PriorityExecutor()
     executor.add_high_priority_node(driver_subscriber)
-    #executor.add_node(enc_left_node)
-    #executor.add_node(enc_right_node)
+    executor.add_node(enc_left_node)
+    executor.add_node(enc_right_node)
 
     executor.spin()
 
