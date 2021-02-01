@@ -4,7 +4,7 @@
   <name>odometry</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="nukoon.o.butdee@gmail.com">NUKOON-PC</maintainer>
+  <maintainer email="nukoon.o.butdee@gmail.com">nugle</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>

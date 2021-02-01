@@ -11,10 +11,17 @@ from std_msgs.msg import Int32
 
 NS_TO_SEC= 1000000000
 
-class OdomPublisher(Node):
+class DiffTf(Node):
+    """
+       diff_tf.py - follows the output of a wheel encoder and
+       creates tf and odometry messages.
+       some code borrowed from the arbotix diff_controller script
+       A good reference: http://rossum.sourceforge.net/papers/DiffSteer/
+    """
+
     def __init__(self):
-        super().__init__("odom")
-        self.nodename = "odom"
+        super().__init__("diff_tf")
+        self.nodename = "diff_tf"
         self.get_logger().info(f"-I- {self.nodename} started")
 
         #### parameters #######
@@ -23,7 +30,7 @@ class OdomPublisher(Node):
 
         self.ticks_meter = float(
             self.declare_parameter('ticks_meter', 7680).value)  # The number of wheel encoder ticks per meter of travel
-        self.base_width = float(self.declare_parameter('base_width', 0.35).value)  # The wheel base width in meters
+        self.base_width = float(self.declare_parameter('base_width', 0.485).value)  # The wheel base width in meters
 
         self.base_frame_id = self.declare_parameter('base_frame_id',
                                                     'base_link').value  # the name of the base frame of the robot
@@ -93,7 +100,7 @@ class OdomPublisher(Node):
             self.y = self.y + (sin(self.th) * x + cos(self.th) * y)
         if th != 0:
             self.th = self.th + th
-        print("pos x : " , self.x , " pos y : " ,self.y , " theta : " , self.th)
+
         # publish the odom information
         quaternion = Quaternion()
         quaternion.x = 0.0
@@ -101,19 +108,7 @@ class OdomPublisher(Node):
         quaternion.z = sin(self.th / 2)
         quaternion.w = cos(self.th / 2)
 
-        transform_stamped_msg = TransformStamped()
-        transform_stamped_msg.header.stamp = self.get_clock().now().to_msg()
-        transform_stamped_msg.header.frame_id = self.base_frame_id
-        transform_stamped_msg.child_frame_id = self.odom_frame_id
-        transform_stamped_msg.transform.translation.x = self.x
-        transform_stamped_msg.transform.translation.y = self.y
-        transform_stamped_msg.transform.translation.z = 0.0
-        transform_stamped_msg.transform.rotation.x = quaternion.x
-        transform_stamped_msg.transform.rotation.y = quaternion.y
-        transform_stamped_msg.transform.rotation.z = quaternion.z
-        transform_stamped_msg.transform.rotation.w = quaternion.w
 
-        self.odom_broadcaster.sendTransform(transform_stamped_msg)
 
         odom = Odometry()
         odom.header.stamp = now.to_msg()
@@ -121,49 +116,63 @@ class OdomPublisher(Node):
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = 0.0
-        odom.pose.pose.orientation.x = quaternion.x
-        odom.pose.pose.orientation.y = quaternion.y
-        odom.pose.pose.orientation.z = quaternion.z
-        odom.pose.pose.orientation.w = quaternion.w
+        odom.pose.pose.orientation = quaternion
         odom.child_frame_id = self.base_frame_id
         odom.twist.twist.linear.x = self.dx
         odom.twist.twist.linear.y = 0.0
-        odom.twist.twist.angular.z = self.th
+        odom.twist.twist.angular.z = self.dr
+        
+
+        transform_stamped_msg = TransformStamped()
+        transform_stamped_msg.header.stamp = self.get_clock().now().to_msg()
+        transform_stamped_msg.header.frame_id = self.odom_frame_id
+        transform_stamped_msg.child_frame_id = self.base_frame_id
+        transform_stamped_msg.transform.translation.x = odom.pose.pose.position.x
+        transform_stamped_msg.transform.translation.y = odom.pose.pose.position.y
+        transform_stamped_msg.transform.translation.z = odom.pose.pose.position.z
+        #transform_stamped_msg.transform.rotation = odom.pose.pose.orientation
+        transform_stamped_msg.transform.rotation.x = quaternion.x
+        transform_stamped_msg.transform.rotation.y = quaternion.y
+        transform_stamped_msg.transform.rotation.z = quaternion.z
+        transform_stamped_msg.transform.rotation.w = quaternion.w 
         self.odom_pub.publish(odom)
+        self.odom_broadcaster.sendTransform(transform_stamped_msg)
 
     def lwheel_callback(self, msg):
         enc = msg.data
         if enc < self.encoder_low_wrap and self.prev_lencoder > self.encoder_high_wrap:
-            self.lmult = self.lmult + 1
+            self.lmult = self.lmult + 1 
 
         if enc > self.encoder_high_wrap and self.prev_lencoder < self.encoder_low_wrap:
             self.lmult = self.lmult - 1
 
         self.left = 1.0 * (enc + self.lmult * (self.encoder_max - self.encoder_min))
         self.prev_lencoder = enc
-
+        #print(self.left)
     def rwheel_callback(self, msg):
         enc = msg.data
         if enc < self.encoder_low_wrap and self.prev_rencoder > self.encoder_high_wrap:
-            self.rmult = self.rmult + 1
+            self.rmult = self.rmult + 1 
 
         if enc > self.encoder_high_wrap and self.prev_rencoder < self.encoder_low_wrap:
             self.rmult = self.rmult - 1
 
-        self.right = 1.0 * (enc + self.rmult * (self.encoder_max - self.encoder_min))
+        self.right = 1.0 * (enc + self.rmult * (self.encoder_max - self.encoder_min)) * -1
         self.prev_rencoder = enc
+        #print(self.right)
 
 def main(args=None):
     rclpy.init(args=args)
     try:
-        odom_node = OdomPublisher()
-        rclpy.spin(odom_node)
+        diff_tf = DiffTf()
+        rclpy.spin(diff_tf)
     except rclpy.exceptions.ROSInterruptException:
         pass
 
-    odom_node.destroy_node()
+    diff_tf.destroy_node()
     rclpy.shutdown()
 
 
 if __name__ == '__main__':
     main()
+
