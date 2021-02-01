@@ -30,7 +30,7 @@ class DiffTf(Node):
 
         self.ticks_meter = float(
             self.declare_parameter('ticks_meter', 7680).value)  # The number of wheel encoder ticks per meter of travel
-        self.base_width = float(self.declare_parameter('base_width', 0.485).value)  # The wheel base width in meters
+        self.base_width = float(self.declare_parameter('base_width', 0.475).value)  # The wheel base width in meters
 
         self.base_frame_id = self.declare_parameter('base_frame_id',
                                                     'base_link').value  # the name of the base frame of the robot
