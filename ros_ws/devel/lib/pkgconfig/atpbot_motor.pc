@@ -1,0 +1,8 @@
+prefix=/home/atpbot/ros_ws/devel
+
+Name: atpbot_motor
+Description: Description of atpbot_motor
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,20 @@
+<launch>
+  <node name ="atpbot_motor"        pkg="atpbot_motor"   type="atpbot_motor.py" output="screen">
+  </node>
+  
+  <node name ="odometry"            pkg="odometry"       type="odom.py" output="screen">
+  </node>
+  
+  <node name ="laser_publisher"        pkg="tf"       type="static_transform_publisher" args="0.5525 0 -0.1 0 0 3.14 base_link laser_frame 50" output="screen">    
+  </node>
+     
+  <node name="rplidarNode"          pkg="rplidar_ros"  type="rplidarNode" output="screen">
+    <param name="serial_port"         type="string" value="/dev/laser0"/>
+    <param name="serial_baudrate"     type="int"    value="115200"/><!--A1/A2 -->
+    <!--param name="serial_baudrate"     type="int"    value="256000"--><!--A3 -->
+    <param name="frame_id"            type="string" value="laser_frame"/>
+    <param name="inverted"            type="bool"   value="false"/>
+    <param name="angle_compensate"    type="bool"   value="true"/>
+    <param name="scan_mode"           type="string" value="Boost"/>
+  </node>
+</launch>
