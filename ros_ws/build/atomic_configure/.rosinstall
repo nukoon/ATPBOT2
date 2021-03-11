@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/atpkeng/ros_ws/devel/setup.sh
